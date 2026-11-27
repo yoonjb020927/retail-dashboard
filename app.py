@@ -5,6 +5,21 @@ DATA_FILE = "retail_rate.csv"  # 데이터 파일 이름 (app.py와 같은 폴�
 REQUIRED_COLUMNS = ["year_month", "C1_NM", "ITM_NM", "retail_index", "base_rate"]  # 꼭 있어야 하는 열
 DEFAULT_ITEMS = ["승용차", "가전제품", "의복", "음식료품"]  # 처음 화면에 보여 줄 대표 품목
 
+# 품목마다 붙일 재 종류 꼬리표 (기말과제_프로젝트_이해정리.md 분류표 기준)
+ITEM_GROUP = {
+    "승용차": "내구재", "가전제품": "내구재", "통신기기 및 컴퓨터": "내구재",
+    "가구": "내구재", "기타내구재": "내구재",
+    "의복": "준내구재", "신발 및 가방": "준내구재", "오락 취미 경기용품": "준내구재",
+    "기타준내구재": "준내구재",
+    "음식료품": "비내구재", "의약품": "비내구재", "화장품": "비내구재",
+    "서적 문구": "비내구재", "차량연료": "비내구재", "기타비내구재": "비내구재",
+}
+
+
+def add_group_tag(name: str) -> str:
+    """'승용차' → '승용차(내구재)'처럼 품목 이름 뒤에 재 종류를 붙인다. 목록에 없으면 그대로 둔다."""
+    return f"{name}({ITEM_GROUP[name]})" if name in ITEM_GROUP else name
+
 st.set_page_config(page_title="금리와 소비 대시보드", layout="wide")  # 브라우저 탭 제목, 넓은 화면
 st.title("기준금리와 품목별 소매판매")  # 맨 위 제목
 st.caption(
@@ -35,13 +50,15 @@ df = raw[REQUIRED_COLUMNS].rename(
     columns={"C1_NM": "품목", "ITM_NM": "지수종류", "retail_index": "판매지수", "base_rate": "기준금리"}
 )
 df = df.assign(연월=pd.to_datetime(df["year_month"].astype(str), format="%Y%m").dt.strftime("%Y-%m"))
+df = df.assign(품목=df["품목"].map(add_group_tag))  # 품목 이름에 꼬리표 붙이기 → 사이드바·그래프·표에 모두 반영
 
 
 # ---------- 2. 사이드바 조건(필터) ----------
 st.sidebar.header("조건 선택")
 
 item_options = sorted(df["품목"].unique())  # 품목 15개
-items = st.sidebar.multiselect("품목 (여러 개 선택)", item_options, default=DEFAULT_ITEMS)
+default_items = [add_group_tag(name) for name in DEFAULT_ITEMS]  # 기본값도 꼬리표 붙은 이름으로 맞춘다
+items = st.sidebar.multiselect("품목 (여러 개 선택)", item_options, default=default_items)
 
 index_type = st.sidebar.radio(
     "지수 종류", ["계절조정지수", "불변지수"], help="계절조정: 명절·계절 효과를 뺀 값 / 불변: 물가 효과를 뺀 값"
