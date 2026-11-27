@@ -56,7 +56,7 @@ df = df.assign(품목=df["품목"].map(add_group_tag))  # 품목 이름에 꼬�
 # ---------- 2. 사이드바 조건(필터) ----------
 st.sidebar.header("조건 선택")
 
-item_options = sorted(df["품목"].unique())  # 품목 15개
+item_options = [add_group_tag(name) for name in ITEM_GROUP]  # 품목 15개, ITEM_GROUP에 적은 순서(내구재→준내구재→비내구재)대로
 default_items = [add_group_tag(name) for name in DEFAULT_ITEMS]  # 기본값도 꼬리표 붙은 이름으로 맞춘다
 items = st.sidebar.multiselect("품목 (여러 개 선택)", item_options, default=default_items)
 
