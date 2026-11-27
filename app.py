@@ -16,6 +16,14 @@ ITEM_GROUP = {
 }
 
 
+# 선 그래프 색 15개 (품목 15개와 같은 개수, 서로 잘 구분되는 색)
+LINE_COLORS = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+    "#393b79", "#ad494a", "#637939", "#843c39", "#7b4173",
+]
+
+
 def add_group_tag(name: str) -> str:
     """'승용차' → '승용차(내구재)'처럼 품목 이름 뒤에 재 종류를 붙인다. 목록에 없으면 그대로 둔다."""
     return f"{name}({ITEM_GROUP[name]})" if name in ITEM_GROUP else name
@@ -88,6 +96,7 @@ if filtered.empty:
 
 # ---------- 4. 지표 카드 ----------
 by_month = filtered.pivot_table(index="연월", columns="품목", values="판매지수")  # 행=월, 열=품목
+by_month = by_month[[name for name in item_options if name in by_month.columns]]  # 열 순서를 내구재→준내구재→비내구재로
 rate_by_month = filtered.groupby("연월")["기준금리"].first()  # 같은 달은 금리가 같으므로 첫 값만
 
 first_avg = by_month.iloc[0].mean()  # 시작 달의 선택 품목 평균 지수
@@ -104,7 +113,9 @@ st.caption(f"최근 = 선택 기간의 마지막 달({end_month}) · 화살표 =
 
 # ---------- 5. 그래프 ----------
 st.subheader("품목별 판매지수 추이")
-st.line_chart(by_month)  # 시간에 따른 변화 → 선 그래프 (품목마다 선 하나)
+# 색을 직접 넘겨야 범례가 가나다순이 아니라 열 순서(내구재→준내구재→비내구재)대로 나온다
+line_colors = LINE_COLORS[: len(by_month.columns)]  # 고른 품목 수만큼 색을 앞에서부터 자른다
+st.line_chart(by_month, color=line_colors)  # 시간에 따른 변화 → 선 그래프 (품목마다 선 하나)
 
 left, right = st.columns(2)
 with left:
@@ -112,13 +123,17 @@ with left:
     st.line_chart(rate_by_month)  # 금리가 언제 오르고 내렸는지
 with right:
     st.subheader("품목별 기간 변화율 (%)")
-    item_change = ((by_month.iloc[-1] / by_month.iloc[0] - 1) * 100).sort_values()  # 품목마다 시작→끝 변화율
-    st.bar_chart(item_change)  # 항목끼리 크기 비교 → 막대 그래프
+    item_change = (by_month.iloc[-1] / by_month.iloc[0] - 1) * 100  # 품목마다 시작→끝 변화율 (by_month 열 순서 그대로)
+    st.bar_chart(item_change, sort=False)  # 항목끼리 크기 비교 → 막대 그래프, sort=False: 가나다순 정렬 끄기
 
 
 # ---------- 6. 상세 표 ----------
 st.subheader("상세 데이터")
-table = filtered[["연월", "품목", "지수종류", "판매지수", "기준금리"]].sort_values(["연월", "품목"])
+item_rank = {name: rank for rank, name in enumerate(item_options)}  # 품목 → 순번(0, 1, 2, ...)
+table = filtered[["연월", "품목", "지수종류", "판매지수", "기준금리"]].sort_values(
+    ["연월", "품목"],
+    key=lambda col: col.map(item_rank) if col.name == "품목" else col,  # 품목은 가나다순 말고 순번으로 정렬
+)
 st.dataframe(table, hide_index=True, width="stretch")  # 표를 화면 폭에 맞춤
 
 
